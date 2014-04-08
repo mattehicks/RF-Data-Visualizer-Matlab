@@ -1,0 +1,112 @@
+
+% Title:        TF9 AWE Graphing Program
+% Created by:   Matt Hicks
+% Company:      ArgonST 2011
+% Notes: inaccurate x-axis labeling, no pass/fail params,
+% no error support, or excel data.
+
+MAX_DATA = 1470;
+
+d=dir('.');
+d=d(~[d.isdir]);
+AWE_FILE = '';
+for i=1:numel(d);
+    filename = d(i).name;
+    if (strfind(filename,'_AWE_'));
+        AWE_FILE = filename;
+        fout = fopen('data.txt','w');
+        fprintf(fout,filename);
+        fprintf(fout,'\r\n');
+        fclose(fout);
+    end
+end;
+
+filetext = fileread(AWE_FILE);
+
+expr6 = '[^\n]*\"Parameter\[6] =[^\n]*';
+expr1 = '[^\n]*\Parameter\[1] =[^\n]*';%number of steps
+expr4 = '[^\n]*\Parameter\[4] =[^\n]*';%center freq
+expr5 = '[^\n]*\Parameter\[5] =[^\n]*';%peak level
+expr2 = '[^\n]*\Parameter\[2] =[^\n]*';%power in band
+
+found_samples = regexp(filetext, expr6, 'match');
+found_steps = regexp(filetext, expr1, 'match');
+found_center = regexp(filetext, expr4, 'match');
+found_peak = regexp(filetext, expr5, 'match');
+found_powerband = regexp(filetext, expr2, 'match');
+
+%%%%%%%%%%%%%%% GET TEST DATE FROM AWE logfile %%%%%%%%%%%%%%%%%%%%
+
+temp_str_date = textscan(found_samples{1},'%s/', 'bufsize', 500);
+str_date = temp_str_date{1};
+date = regexprep(str_date{1}, '/', '_');
+
+mkdir('3Dgraphs');
+halfpath = strcat (pwd,'\3Dgraphs\');
+
+workingtitle = strrep(date,'_', '/');
+
+%%%%%%%%%%%%%%%%%%%% GETTING SAMPLE DATA %%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for temp_i = 1:length(found_samples);
+    
+    %% PART 1 - Telemetry Data
+    
+    y_data(1,temp_i) = textscan(found_samples{temp_i},'%s', 'delimiter', ', "', 'Bufsize', 500);
+    y_data{temp_i}(1:11) = []; % extra data parsed from logfile
+    y{1,temp_i} = str2double(y_data{temp_i});
+    
+    %% PART 2 - Variable Info
+    
+    final_params_to_plot(1,temp_i) = textscan(found_steps{temp_i},'%s', 'delimiter', ', "', 'Bufsize', 100);
+    final_params_to_plot(2,temp_i) = textscan(found_powerband{temp_i},'%s', 'delimiter', ', "', 'Bufsize', 100);
+    final_params_to_plot(4,temp_i) = textscan(found_center{temp_i},'%s', 'delimiter', ', "', 'Bufsize', 100);
+    final_params_to_plot(5,temp_i) = textscan(found_peak{temp_i},'%s', 'delimiter', ', "', 'Bufsize', 100);
+    
+    final_params_to_plot{1,temp_i}= str2double(final_params_to_plot{1,temp_i}(11));  % steps
+    final_params_to_plot{2,temp_i}= str2double(final_params_to_plot{2,temp_i}(11));  % power in band
+    final_params_to_plot{4,temp_i}= str2double(final_params_to_plot{4,temp_i}(11));  % center
+    final_params_to_plot{5,temp_i}= str2double(final_params_to_plot{5,temp_i}(11));  % peak level
+    
+    final_params_to_plot{6,temp_i} = str2double(y_data{1,1}(1));  % start
+    final_params_to_plot{7,temp_i} = str2double(y_data{1,1}(2));  % step
+    
+end;
+
+%%%%%% Variables in "final_params_to_plot"  %%%%%%%%%%%%%%%
+%1:  Number of steps in sample
+%2:  Power in Band
+%3:  Malkovich
+%4:  Center frequency
+%5:  Peak power
+%6:  Start frequency
+%7:  Step size
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %%%%%%%%%% 3d plot1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  
+    figure;
+    fig = gcf;
+    
+    for t = 1:15; 
+    y1 = y{t};
+    y1(1:2,:) = []; %unused parameters
+    x = 1:length(y1);
+    q = 1:length(y1); 
+    q(:) = 1;
+    plot3(x,q+(t*10),y1,'LineWidth',1,...
+                'MarkerEdgeColor','k',...
+                'MarkerFaceColor',[.49 1 .63],...
+                'MarkerSize',10);
+    xlabel (workingtitle);
+    fprintf(1,'.00. ');
+    hold all;
+    end;
+     try
+          p_date = strcat('3D_Files_',date);
+            fullpath = strcat(halfpath, p_date);% half is directory, full is filename
+            saveas(fig, fullpath, 'jpg');
+            fprintf(1,'Saved.\n');
+        catch exception
+             fprintf(1,'error creating file %s', fullpath);
+     end;
+    
